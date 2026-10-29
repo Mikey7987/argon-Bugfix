@@ -1,0 +1,52 @@
+name: Build Argon
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Extract source ZIP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip
+          find . -maxdepth 2 -name '*.zip' -print
+          mkdir source
+          ZIP=$(find . -maxdepth 2 -name '*.zip' | head -n 1)
+          test -n "$ZIP" || { echo "No source ZIP found"; exit 1; }
+          unzip -q "$ZIP" -d source
+
+      - name: Build with Gradle
+        run: |
+          WRAPPER=$(find source -name gradlew -type f | head -n 1)
+          if [ -n "$WRAPPER" ]; then
+            cd "$(dirname "$WRAPPER")"
+            chmod +x gradlew
+            ./gradlew build
+          else
+            echo "No Gradle wrapper found in ZIP"
+            exit 1
+          fi
+
+      - name: Upload compiled JAR
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Argon-build
+          path: source/**/build/libs/*.jar
+          if-no-files-found: error
+          
